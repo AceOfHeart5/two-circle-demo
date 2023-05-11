@@ -1,0 +1,1 @@
+Just a simple web app to add/move/remove circles from a space, and connect them with lines. This is a way to practice react, redux, and the two library.
