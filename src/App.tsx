@@ -1,14 +1,13 @@
-import Canvas from "./components/Canvas";
 import ModeSelector from "./components/ModeSelector";
 import MouseDisplay from "./components/MouseDisplay";
-import TwoCanvas from "./components/TwoCanvas";
+import TwoArea from "./components/TwoArea";
 
 const App = () => {
   return (
     <div>
       <MouseDisplay/>
       <ModeSelector/>
-      <TwoCanvas/>
+      <TwoArea/>
     </div>
   )
 };

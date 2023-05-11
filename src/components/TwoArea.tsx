@@ -19,7 +19,7 @@ const twoAreaDimensions = {
     height: 700,
 };
 
-const TwoCanvas = () => {
+const TwoArea = () => {
     const dispatch = useAppDispatch();
     const refDiv = useRef<HTMLDivElement>(null);
     const refTwo = useRef<Two>();
@@ -57,7 +57,7 @@ const TwoCanvas = () => {
 
     const refPanning = useRef(false);
 
-    const setup = useCallback(() => {
+    useEffect(() => {
         refTwo.current = new Two(twoAreaDimensions);
         refGroup.current = refTwo.current.makeGroup();
         refZui.current = new ZUI(refGroup.current);
@@ -202,8 +202,6 @@ const TwoCanvas = () => {
         };
     }, []);
 
-    useEffect(setup, []);
-
     useEffect(() => {
         refCircles.current = circles;
         refConnections.current = connections;
@@ -293,4 +291,4 @@ const TwoCanvas = () => {
     />;
 };
 
-export default TwoCanvas;
+export default TwoArea;
