@@ -184,8 +184,9 @@ const TwoArea = () => {
             if (e.code === "Space" && e.type === "keydown") refPanning.current = true;
             if (e.code === "Space" && e.type === "keyup") refPanning.current = false;
         };
+        // click event does not work correctly in chrome, using mouseup instead
         div?.addEventListener("mousemove", onMouseMove);
-        div?.addEventListener("click", onClick);
+        div?.addEventListener("mouseup", onClick);
         div?.addEventListener("wheel", onScroll);
         document.addEventListener("keydown", onSpace);
         document.addEventListener("keyup", onSpace);
@@ -195,7 +196,7 @@ const TwoArea = () => {
             const parentElement: HTMLElement = two?.renderer.domElement.parentElement;
             parentElement.removeChild(two?.renderer.domElement);
             div?.removeEventListener("mousemove", onMouseMove);
-            div?.removeEventListener("click", onClick);
+            div?.removeEventListener("mouseup", onClick);
             div?.removeEventListener("wheel", onScroll);
             document.removeEventListener("keydown", onSpace);
             document.removeEventListener("keyup", onSpace);
