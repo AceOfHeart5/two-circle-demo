@@ -240,10 +240,9 @@ const TwoArea = () => {
                 newCircle.id = c.id;
                 group.add(newCircle);
             }
-            const groupCircle = group.getById(c.id);
+            const groupCircle = group.getById(c.id) as Circle;
             groupCircle.position.x = c.x;
             groupCircle.position.y = c.y;
-            // @ts-ignore
             groupCircle.fill = c.color
         });
 
@@ -255,16 +254,12 @@ const TwoArea = () => {
                 newConnection.id = c.id;
                 group.add(newConnection);
             }
-            const groupConnection = group.getById(c.id);
+            const groupConnection = group.getById(c.id) as Line;
             const circle1 = circles[c.circle1Index];
             const circle2 = circles[c.circle2Index];
-            // @ts-ignore two typing is incorrect here
             groupConnection.vertices[0].x = circle1.x;
-            // @ts-ignore
             groupConnection.vertices[0].y = circle1.y;
-            // @ts-ignore
             groupConnection.vertices[1].x = circle2.x;
-            // @ts-ignore
             groupConnection.vertices[1].y = circle2.y;
         });
 
