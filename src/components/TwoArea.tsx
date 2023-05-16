@@ -11,7 +11,7 @@ import { distance } from "../utils/utils";
 import { ZUI } from "two.js/extras/jsm/zui";
 import { Group } from "two.js/src/group";
 import { Line } from "two.js/src/shapes/line";
-import { connectionAdd, selectConnections } from "../state/connectionsSlice";
+import { connectionAdd, connectionDeleteContainingCircleIndex, selectConnections } from "../state/connectionsSlice";
 import { Shape } from "two.js/src/shape";
 
 const twoAreaDimensions = {
@@ -75,6 +75,7 @@ const TwoArea = () => {
             refGroup.current.add(lineX, lineY);    
         }
 
+        refPossibleConnectionLine.current.id = "possible-connection";
         refPossibleConnectionLine.current.stroke = CONNECTION_COLOR;
         refPossibleConnectionLine.current.visible = false;
         refGroup.current.add(refPossibleConnectionLine.current);
@@ -151,7 +152,10 @@ const TwoArea = () => {
                     y: refMousePosition.current.y,
                 }));
             }
-            if (refEditMode.current === "remove-circle" && refIndexHovering.current >= 0) dispatch(circlesDeleteAtIndex(refIndexHovering.current));
+            if (refEditMode.current === "remove-circle" && refIndexHovering.current >= 0) {
+                dispatch(connectionDeleteContainingCircleIndex(refIndexHovering.current));
+                dispatch(circlesDeleteAtIndex(refIndexHovering.current));
+            }
             if (refEditMode.current === "add-connection-start" && refIndexHovering.current >= 0) {
                 refFirstConnectionIndex.current = refIndexHovering.current;
                 dispatch(editSetMode("add-connection-end"));

@@ -22,6 +22,9 @@ const connectionsSlice = createSlice({
                 circle2Index: action.payload.index2,
             }];
         },
+        connectionDeleteContainingCircleIndex: (state, action: PayloadAction<number>) => {
+            state.array = state.array.filter(c => c.circle1Index !== action.payload && c.circle2Index !== action.payload);
+        },
         connectionDeleteAtIndex: (state, action: PayloadAction<number>) => {
             const index = action.payload;
             state.array = state.array.filter((_v, i) => i !== index);
@@ -29,7 +32,7 @@ const connectionsSlice = createSlice({
     },
 });
 
-export const { connectionAdd, connectionDeleteAtIndex } = connectionsSlice.actions;
+export const { connectionAdd, connectionDeleteContainingCircleIndex, connectionDeleteAtIndex } = connectionsSlice.actions;
 
 export const selectConnections = (state: RootState) => state.connections.array;
 
