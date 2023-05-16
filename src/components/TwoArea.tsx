@@ -224,23 +224,15 @@ const TwoArea = () => {
         connections.forEach(c => connectionIds.add(c.id));
 
         // remove circles and connections from two group that are not in updated states
-        // and build set of ids of circles and connections already in group
-        const twoCircleIds = new Set<string>();
-        const twoConnectionIds = new Set<string>();
         group.children.forEach((c: Shape) => {
-            if (c.id.startsWith("circle")) {
-                twoCircleIds.add(c.id);
-                if (!circleIds.has(c.id)) c.remove();
-            }
-            if (c.id.startsWith("connection")) {
-                twoConnectionIds.add(c.id);
-                if (!connectionIds.has(c.id)) c.remove();
-            }
+            if (c.id.startsWith("circle") && !circleIds.has(c.id)) c.remove();
+            if (c.id.startsWith("connection") && !connectionIds.has(c.id)) c.remove();
         });
 
         // iterate over state circles, add missing two circles, and update existing to new state
         circles.forEach(c => {
-            if (!twoCircleIds.has(c.id)) {
+            const check = group.getById(c.id) as Circle;
+            if (!check) {
                 const newCircle = new Circle(c.x, c.y, c.radius);
                 newCircle.id = c.id;
                 group.add(newCircle);
@@ -253,7 +245,8 @@ const TwoArea = () => {
 
         // iterate over state connections, add missing two connections, and update existing to new state
         connections.forEach(c => {
-            if (!twoConnectionIds.has(c.id)) {
+            const check = group.getById(c.id) as Line;
+            if (!check) {
                 const newConnection = new Line(circles[c.circle1Index].x, circles[c.circle1Index].y, circles[c.circle2Index].x, circles[c.circle2Index].y);
                 newConnection.stroke = CONNECTION_COLOR;
                 newConnection.id = c.id;
