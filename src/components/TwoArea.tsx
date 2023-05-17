@@ -25,7 +25,7 @@ const TwoArea = () => {
     const refTwo = useRef<Two>();
     const refGroup = useRef<Group>();
     const refZui = useRef<ZUI>();
-    const refCursor = useRef<Circle>();
+    const refCursor = useRef(new Circle(0, 0, CIRCLE_RADIUS));
 
     const mousePositionX = useSelector(selectMousePositionX);
     const mousePositionY = useSelector(selectMousePositionY);
@@ -47,6 +47,11 @@ const TwoArea = () => {
 
     const connections = useSelector(selectConnections);
     const refConnections = useRef(connections);
+
+    useEffect(() => {
+        refCircles.current = circles;
+        refConnections.current = connections;
+    }, [circles, connections]);
 
     const refPossibleConnectionLine = useRef(new Line(0, 0, 7, 7));
 
@@ -80,7 +85,8 @@ const TwoArea = () => {
         refPossibleConnectionLine.current.visible = false;
         refGroup.current.add(refPossibleConnectionLine.current);
 
-        refCursor.current = new Circle(refMousePosition.current.x, refMousePosition.current.y, CIRCLE_RADIUS);
+        refCursor.current.position.x = refMousePosition.current.x;
+        refCursor.current.position.y = refMousePosition.current.y;
         refCursor.current.noFill();
         refCursor.current.id = "cursor";
         refGroup.current.add(refCursor.current);
@@ -90,6 +96,7 @@ const TwoArea = () => {
         if (div) two.appendTo(div);
 
         const update = () => {
+            // update state aspects
             if (!refCursor.current) return;
             refCursor.current.visible = refEditMode.current === "add-circle";
             refCursor.current.position.x = refMousePosition.current.x;
@@ -127,6 +134,70 @@ const TwoArea = () => {
                 refPossibleConnectionLine.current.vertices[1].y = refCircles.current[refIndexHovering.current].y;
                 refPossibleConnectionLine.current.visible = true;
             } else refPossibleConnectionLine.current.visible = false;
+
+            // update two state
+            const cs = refCircles.current;
+            const group = refGroup.current;
+            if (!group) return;
+    
+            // synch state and two objects
+    
+            // get set of circle ids from state
+            const circleIds = new Set<string>();
+            cs.forEach(c => circleIds.add(c.id));
+    
+            // get set of connections ids from state
+            const connectionIds = new Set<string>();
+            refConnections.current.forEach(c => connectionIds.add(c.id));
+    
+            // remove circles and connections from two group that are not in updated states
+            group.children.forEach((c: Shape) => {
+                if (c.id.startsWith("circle") && !circleIds.has(c.id)) c.remove();
+                if (c.id.startsWith("connection") && !connectionIds.has(c.id)) c.remove();
+            });
+    
+            // iterate over state circles, add missing two circles, and update existing to new state
+            cs.forEach(c => {
+                const check = group.getById(c.id) as Circle;
+                if (!check) {
+                    const newCircle = new Circle(c.x, c.y, c.radius);
+                    newCircle.id = c.id;
+                    group.add(newCircle);
+                }
+                const groupCircle = group.getById(c.id) as Circle;
+                groupCircle.position.x = c.x;
+                groupCircle.position.y = c.y;
+                groupCircle.fill = c.color
+            });
+    
+            // iterate over state connections, add missing two connections, and update existing to new state
+            refConnections.current.forEach(c => {
+                const check = group.getById(c.id) as Line;
+                if (!check) {
+                    const newConnection = new Line(cs[c.circle1Index].x, cs[c.circle1Index].y, cs[c.circle2Index].x, cs[c.circle2Index].y);
+                    newConnection.stroke = CONNECTION_COLOR;
+                    newConnection.id = c.id;
+                    group.add(newConnection);
+                }
+                const groupConnection = group.getById(c.id) as Line;
+                const circle1 = cs[c.circle1Index];
+                const circle2 = cs[c.circle2Index];
+                groupConnection.vertices[0].x = circle1.x;
+                groupConnection.vertices[0].y = circle1.y;
+                groupConnection.vertices[1].x = circle2.x;
+                groupConnection.vertices[1].y = circle2.y;
+            });
+    
+            const getShapeValue = (shapeId: string) => {
+                if (shapeId.startsWith("connection")) return 1;
+                if (shapeId.startsWith("circle")) return 2;
+                if (shapeId === "cursor") return 3;
+                return -1;
+            };
+    
+            group.children.sort((a: Shape, b: Shape) => {
+                return getShapeValue(a.id) - getShapeValue(b.id);
+            });
         };
 
         two.bind("update", update);
@@ -206,72 +277,6 @@ const TwoArea = () => {
             document.removeEventListener("keyup", onSpace);
         };
     }, []);
-
-    useEffect(() => {
-        refCircles.current = circles;
-        refConnections.current = connections;
-        const group = refGroup.current;
-        if (!group) return;
-
-        // synch state and two objects
-
-        // get set of circle ids from state
-        const circleIds = new Set<string>();
-        circles.forEach(c => circleIds.add(c.id));
-
-        // get set of connections ids from state
-        const connectionIds = new Set<string>();
-        connections.forEach(c => connectionIds.add(c.id));
-
-        // remove circles and connections from two group that are not in updated states
-        group.children.forEach((c: Shape) => {
-            if (c.id.startsWith("circle") && !circleIds.has(c.id)) c.remove();
-            if (c.id.startsWith("connection") && !connectionIds.has(c.id)) c.remove();
-        });
-
-        // iterate over state circles, add missing two circles, and update existing to new state
-        circles.forEach(c => {
-            const check = group.getById(c.id) as Circle;
-            if (!check) {
-                const newCircle = new Circle(c.x, c.y, c.radius);
-                newCircle.id = c.id;
-                group.add(newCircle);
-            }
-            const groupCircle = group.getById(c.id) as Circle;
-            groupCircle.position.x = c.x;
-            groupCircle.position.y = c.y;
-            groupCircle.fill = c.color
-        });
-
-        // iterate over state connections, add missing two connections, and update existing to new state
-        connections.forEach(c => {
-            const check = group.getById(c.id) as Line;
-            if (!check) {
-                const newConnection = new Line(circles[c.circle1Index].x, circles[c.circle1Index].y, circles[c.circle2Index].x, circles[c.circle2Index].y);
-                newConnection.stroke = CONNECTION_COLOR;
-                newConnection.id = c.id;
-                group.add(newConnection);
-            }
-            const groupConnection = group.getById(c.id) as Line;
-            const circle1 = circles[c.circle1Index];
-            const circle2 = circles[c.circle2Index];
-            groupConnection.vertices[0].x = circle1.x;
-            groupConnection.vertices[0].y = circle1.y;
-            groupConnection.vertices[1].x = circle2.x;
-            groupConnection.vertices[1].y = circle2.y;
-        });
-
-        const getShapeValue = (shapeId: string) => {
-            if (shapeId.startsWith("connection")) return 1;
-            if (shapeId.startsWith("circle")) return 2;
-            if (shapeId === "cursor") return 3;
-            return -1;
-        };
-
-        group.children.sort((a: Shape, b: Shape) => {
-            return getShapeValue(a.id) - getShapeValue(b.id);
-        });
-    }, [circles, connections]);
 
     return <div 
         ref={refDiv}
