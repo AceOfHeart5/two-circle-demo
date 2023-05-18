@@ -17,6 +17,18 @@ const connectionsSlice = createSlice({
     initialState: adapter.getInitialState(),
     reducers: {
         connectionAddOne: (state, action: PayloadAction<{ circle1Id: string, circle2Id: string }>) => {
+            const circle1Id = action.payload.circle1Id;
+            const circle2Id = action.payload.circle2Id;
+
+            if (circle1Id === circle2Id) return;
+
+            for (const id in state.entities) {
+                const c = state.entities[id];
+                if (!c) continue;
+                if (c.circle1Id === circle1Id && c.circle2Id === circle2Id) return;
+                if (c.circle1Id === circle2Id && c.circle2Id === circle1Id) return;
+            }
+
             adapter.addOne(state, {
                 id: "connection-" + uuid(),
                 circle1Id: action.payload.circle1Id,

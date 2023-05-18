@@ -37,7 +37,6 @@ export const { circlesAddOne, circlesUpdateOne, circlesRemoveOne } = circlesSlic
 
 const selectors = adapter.getSelectors();
 
-export const selectCirclesAll = (state: RootState) => selectors.selectAll(state.circles);
 export const selectCirclesEntities = (state: RootState) => selectors.selectEntities(state.circles);
 
 export default circlesSlice.reducer;
