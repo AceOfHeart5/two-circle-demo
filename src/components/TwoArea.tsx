@@ -1,17 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Two from "two.js";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { editSetMode, selectEditMode } from "../state/editingSlice";
 import { mouseSetPosition, selectMousePositionX, selectMousePositionY } from "../state/mouseSlice";
-import { circlesAdd, circlesDeleteAtIndex, circlesUpdateAtIndex, selectCircles } from "../state/circlesSlice";
+import { Circle, circlesAddOne, circlesRemoveOne, circlesUpdateOne, selectCirclesEntities } from "../state/circlesSlice";
 import { CIRCLE_RADIUS, CONNECTION_COLOR } from "../constants";
-import { Circle } from "two.js/src/shapes/circle";
-import { useSelector } from "react-redux";
+import { Circle as TwoCircle } from "two.js/src/shapes/circle";
 import { distance } from "../utils/utils";
 import { ZUI } from "two.js/extras/jsm/zui";
 import { Group } from "two.js/src/group";
 import { Line } from "two.js/src/shapes/line";
-import { connectionAdd, connectionDeleteContainingCircleIndex, selectConnections } from "../state/connectionsSlice";
+import { connectionAddOne, connectionDeleteContainingCircleId, selectConnectionsAll } from "../state/connectionsSlice";
 import { Shape } from "two.js/src/shape";
 
 const twoAreaDimensions = {
@@ -25,10 +24,11 @@ const TwoArea = () => {
     const refTwo = useRef<Two>();
     const refGroup = useRef<Group>();
     const refZui = useRef<ZUI>();
-    const refCursor = useRef(new Circle(0, 0, CIRCLE_RADIUS));
+    const refCursor = useRef<TwoCircle | null>(null);
+    if (!refCursor.current) refCursor.current = new TwoCircle(0, 0, CIRCLE_RADIUS);
 
-    const mousePositionX = useSelector(selectMousePositionX);
-    const mousePositionY = useSelector(selectMousePositionY);
+    const mousePositionX = useAppSelector(selectMousePositionX);
+    const mousePositionY = useAppSelector(selectMousePositionY);
     const refMousePosition = useRef({ x: mousePositionX, y: mousePositionY });
 
     useEffect(() => {
@@ -42,10 +42,10 @@ const TwoArea = () => {
         refEditMode.current = editMode;
     }, [editMode]);
 
-    const circles = useSelector(selectCircles);
+    const circles = useAppSelector(selectCirclesEntities);
     const refCircles = useRef(circles);
 
-    const connections = useSelector(selectConnections);
+    const connections = useAppSelector(selectConnectionsAll);
     const refConnections = useRef(connections);
 
     useEffect(() => {
@@ -54,12 +54,10 @@ const TwoArea = () => {
     }, [circles, connections]);
 
     const refPossibleConnectionLine = useRef(new Line(0, 0, 7, 7));
-
     const cursorOverlap = useRef(false);
-    const refIndexHovering = useRef(-1); // index of circle in state array, not id
-    const refFirstConnectionIndex = useRef(-1); // also index of circle in array
-    const refCircleMovingIndex = useRef(-1);
-
+    const refCircleHovering = useRef<Circle | null>(null);
+    const refFirstConnectionCircle = useRef<Circle | null>(null);
+    const refCircleMoving = useRef<Circle | null>(null);
     const refPanning = useRef(false);
 
     useEffect(() => {
@@ -85,11 +83,13 @@ const TwoArea = () => {
         refPossibleConnectionLine.current.visible = false;
         refGroup.current.add(refPossibleConnectionLine.current);
 
-        refCursor.current.position.x = refMousePosition.current.x;
-        refCursor.current.position.y = refMousePosition.current.y;
-        refCursor.current.noFill();
-        refCursor.current.id = "cursor";
-        refGroup.current.add(refCursor.current);
+        if (refCursor.current) {
+            refCursor.current.position.x = refMousePosition.current.x;
+            refCursor.current.position.y = refMousePosition.current.y;
+            refCursor.current.noFill();
+            refCursor.current.id = "cursor";
+            refGroup.current.add(refCursor.current);
+        }
 
         const two = refTwo.current;
         const div = refDiv.current;
@@ -102,41 +102,48 @@ const TwoArea = () => {
             refCursor.current.position.x = refMousePosition.current.x;
             refCursor.current.position.y = refMousePosition.current.y;
             cursorOverlap.current = false;
-            refIndexHovering.current = -1;
-            if (refEditMode.current !== "add-connection-end") refFirstConnectionIndex.current = -1;
-            refCircles.current.forEach((c, i) => {
+            refCircleHovering.current = null;
+            if (refEditMode.current !== "add-connection-end") refFirstConnectionCircle.current = null;
+            for (const key in refCircles.current) {
+                const c = refCircles.current[key];
+                if (!c) continue;
                 const overlapDist = distance(c.x, c.y, refMousePosition.current.x, refMousePosition.current.y);
                 if (overlapDist <= (c.radius + CIRCLE_RADIUS)) cursorOverlap.current = true;
                 const mouseDist = distance(refMousePosition.current.x, refMousePosition.current.y, c.x, c.y);
-                if (mouseDist < c.radius) refIndexHovering.current = i;
+                if (mouseDist < c.radius) refCircleHovering.current = c;
                 const hovering = mouseDist < c.radius;
                 let circleColor = "#aaa";
                 if (refEditMode.current === "remove-circle" && hovering) circleColor = "#ff0";
                 if (refEditMode.current === "add-connection-start" && hovering) circleColor = CONNECTION_COLOR;
                 if (refEditMode.current === "add-connection-end" && hovering) circleColor = CONNECTION_COLOR;
-                if (refEditMode.current === "add-connection-end" && i === refFirstConnectionIndex.current) circleColor = CONNECTION_COLOR;
+                if (refEditMode.current === "add-connection-end" && c.id === refFirstConnectionCircle.current?.id) circleColor = CONNECTION_COLOR;
                 const position = {
-                    x: refCircleMovingIndex.current >= 0 ? refMousePosition.current.x : c.x,
-                    y: refCircleMovingIndex.current >= 0 ? refMousePosition.current.y : c.y,
+                    x: refCircleMoving.current ? refMousePosition.current.x : c.x,
+                    y: refCircleMoving.current ? refMousePosition.current.y : c.y,
                 };
-                if (c.color !== circleColor || refCircleMovingIndex.current === i) {
-                    dispatch(circlesUpdateAtIndex({
-                        index: i,
-                        circle: {...c, color: circleColor, x: position.x, y: position.y },
+                if (c.color !== circleColor || refCircleMoving.current?.id === c.id) {
+                    dispatch(circlesUpdateOne({
+                        id: c.id,
+                        changes: { ...c, color: circleColor, x: position.x, y: position.y },
                     }));
                 };
-            });
+            }
+            
             refCursor.current.stroke = cursorOverlap.current ? "red" : "black";
-            if (refIndexHovering.current >= 0 && refFirstConnectionIndex.current >= 0 && refEditMode.current === "add-connection-end") {
-                refPossibleConnectionLine.current.vertices[0].x = refCircles.current[refFirstConnectionIndex.current].x;
-                refPossibleConnectionLine.current.vertices[0].y = refCircles.current[refFirstConnectionIndex.current].y;
-                refPossibleConnectionLine.current.vertices[1].x = refCircles.current[refIndexHovering.current].x;
-                refPossibleConnectionLine.current.vertices[1].y = refCircles.current[refIndexHovering.current].y;
+            if (refEditMode.current === "add-connection-end") {
                 refPossibleConnectionLine.current.visible = true;
+                if (refCircleHovering.current && refFirstConnectionCircle.current) {
+                    refPossibleConnectionLine.current.vertices[0].x = refFirstConnectionCircle.current.x;
+                    refPossibleConnectionLine.current.vertices[0].y = refFirstConnectionCircle.current.y;
+                    refPossibleConnectionLine.current.vertices[1].x = refCircleHovering.current.x;
+                    refPossibleConnectionLine.current.vertices[1].y = refCircleHovering.current.y;
+                } else {
+                    refPossibleConnectionLine.current.vertices[1].x = refMousePosition.current.x;
+                    refPossibleConnectionLine.current.vertices[1].y = refMousePosition.current.y;
+                }
             } else refPossibleConnectionLine.current.visible = false;
 
             // update two state
-            const cs = refCircles.current;
             const group = refGroup.current;
             if (!group) return;
     
@@ -144,7 +151,7 @@ const TwoArea = () => {
     
             // get set of circle ids from state
             const circleIds = new Set<string>();
-            cs.forEach(c => circleIds.add(c.id));
+            for (const id in refCircles.current) circleIds.add(id);
     
             // get set of connections ids from state
             const connectionIds = new Set<string>();
@@ -157,31 +164,34 @@ const TwoArea = () => {
             });
     
             // iterate over state circles, add missing two circles, and update existing to new state
-            cs.forEach(c => {
-                const check = group.getById(c.id) as Circle;
+            for (const id in refCircles.current) {
+                const c = refCircles.current[id];
+                if (!c) continue;
+                const check = group.getById(c.id) as TwoCircle;
                 if (!check) {
-                    const newCircle = new Circle(c.x, c.y, c.radius);
+                    const newCircle = new TwoCircle(c.x, c.y, c.radius);
                     newCircle.id = c.id;
                     group.add(newCircle);
                 }
-                const groupCircle = group.getById(c.id) as Circle;
+                const groupCircle = group.getById(c.id) as TwoCircle;
                 groupCircle.position.x = c.x;
                 groupCircle.position.y = c.y;
                 groupCircle.fill = c.color
-            });
+            }
     
             // iterate over state connections, add missing two connections, and update existing to new state
             refConnections.current.forEach(c => {
+                const circle1 = refCircles.current[c.circle1Id];
+                const circle2 = refCircles.current[c.circle2Id];
+                if (!circle1 || !circle2) return;
                 const check = group.getById(c.id) as Line;
                 if (!check) {
-                    const newConnection = new Line(cs[c.circle1Index].x, cs[c.circle1Index].y, cs[c.circle2Index].x, cs[c.circle2Index].y);
+                    const newConnection = new Line(circle1.x, circle1.y, circle2.x, circle2.y);
                     newConnection.stroke = CONNECTION_COLOR;
                     newConnection.id = c.id;
                     group.add(newConnection);
                 }
                 const groupConnection = group.getById(c.id) as Line;
-                const circle1 = cs[c.circle1Index];
-                const circle2 = cs[c.circle2Index];
                 groupConnection.vertices[0].x = circle1.x;
                 groupConnection.vertices[0].y = circle1.y;
                 groupConnection.vertices[1].x = circle2.x;
@@ -217,38 +227,36 @@ const TwoArea = () => {
         };
         const onClick = (e: MouseEvent) => {
             if (refEditMode.current === "add-circle" && !cursorOverlap.current) {
-                dispatch(circlesAdd({
-                    id: "circle-" + Date.now().toString(),
+                dispatch(circlesAddOne({
                     x: refMousePosition.current.x,
                     y: refMousePosition.current.y,
                 }));
             }
-            if (refEditMode.current === "remove-circle" && refIndexHovering.current >= 0) {
-                dispatch(connectionDeleteContainingCircleIndex(refIndexHovering.current));
-                dispatch(circlesDeleteAtIndex(refIndexHovering.current));
+            if (refEditMode.current === "remove-circle" && refCircleHovering.current) {
+                dispatch(connectionDeleteContainingCircleId(refCircleHovering.current.id));
+                dispatch(circlesRemoveOne(refCircleHovering.current.id));
             }
-            if (refEditMode.current === "add-connection-start" && refIndexHovering.current >= 0) {
-                refFirstConnectionIndex.current = refIndexHovering.current;
+            if (refEditMode.current === "add-connection-start" && refCircleHovering.current) {
+                refFirstConnectionCircle.current = refCircleHovering.current;
                 dispatch(editSetMode("add-connection-end"));
             }
-            if (refEditMode.current === "add-connection-end" && refIndexHovering.current >= 0 && refFirstConnectionIndex.current >= 0) {
-                dispatch(connectionAdd({
-                    id: "connection-" + Date.now(),
-                    index1: refFirstConnectionIndex.current, 
-                    index2: refIndexHovering.current,
+            if (refEditMode.current === "add-connection-end" && refCircleHovering.current && refFirstConnectionCircle.current) {
+                dispatch(connectionAddOne({
+                    circle1Id: refFirstConnectionCircle.current.id,
+                    circle2Id: refCircleHovering.current.id,
                 }));
-                refIndexHovering.current = -1;
-                refFirstConnectionIndex.current = -1;
+                refCircleHovering.current = null;
+                refFirstConnectionCircle.current = null;
                 dispatch(editSetMode("add-connection-start"));
             }
             if (refEditMode.current === "move-circle") {            
-                if (refIndexHovering.current >= 0 && refCircleMovingIndex.current === -1) {
-                    refCircleMovingIndex.current = refIndexHovering.current;
-                } else if (refCircleMovingIndex.current >= 0) {
-                    refCircleMovingIndex.current = -1;
+                if (refCircleHovering.current && !refCircleMoving.current) {
+                    refCircleMoving.current = refCircleHovering.current;
+                } else if (refCircleMoving.current) {
+                    refCircleMoving.current = null;
                 }
             }
-            if (refEditMode.current !== "move-circle") refCircleMovingIndex.current = -1;
+            if (refEditMode.current !== "move-circle") refCircleMoving.current = null;
         };
         const onScroll = (e: WheelEvent) => {
             const dy = (e.deltaY) / 1000;

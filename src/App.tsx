@@ -3,13 +3,13 @@ import MouseDisplay from "./components/MouseDisplay";
 import TwoArea from "./components/TwoArea";
 
 const App = () => {
-  return (
-    <div>
-      <MouseDisplay/>
-      <ModeSelector/>
-      <TwoArea/>
-    </div>
-  )
+	return (
+		<div>
+			<MouseDisplay/>
+			<ModeSelector/>
+			<TwoArea/>
+		</div>
+	);
 };
 
 export default App;

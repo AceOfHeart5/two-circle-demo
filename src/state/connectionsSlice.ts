@@ -1,39 +1,41 @@
-import { PayloadAction, createSlice } from "@reduxjs/toolkit";
+import { PayloadAction, createEntityAdapter, createSlice } from "@reduxjs/toolkit";
+import { v4 as uuid } from "uuid";
 import { RootState } from "./store";
 
-interface Connection {
+export interface Connection {
     id: string,
-    circle1Index: number,
-    circle2Index: number,
+    circle1Id: string,
+    circle2Id: string,
 }
 
-const initialState = {
-    array: new Array<Connection>(),
-};
+const adapter = createEntityAdapter<Connection>({
+    selectId: c => c.id,
+});
 
 const connectionsSlice = createSlice({
     name: "connections",
-    initialState,
+    initialState: adapter.getInitialState(),
     reducers: {
-        connectionAdd: (state, action: PayloadAction<{ id: string, index1: number, index2: number }>) => {
-            state.array = [...state.array, {
-                id: action.payload.id,
-                circle1Index: action.payload.index1,
-                circle2Index: action.payload.index2,
-            }];
+        connectionAddOne: (state, action: PayloadAction<{ circle1Id: string, circle2Id: string }>) => {
+            adapter.addOne(state, {
+                id: "connection-" + uuid(),
+                circle1Id: action.payload.circle1Id,
+                circle2Id: action.payload.circle2Id,
+            });
         },
-        connectionDeleteContainingCircleIndex: (state, action: PayloadAction<number>) => {
-            state.array = state.array.filter(c => c.circle1Index !== action.payload && c.circle2Index !== action.payload);
+        connectionDeleteContainingCircleId: (state, action: PayloadAction<string>) => {
+            adapter.removeMany(state, state.ids.filter(id => {
+                if (state.entities[id]?.circle1Id === action.payload) return true;
+                if (state.entities[id]?.circle2Id === action.payload) return true;
+                return false;
+            }));
         },
-        connectionDeleteAtIndex: (state, action: PayloadAction<number>) => {
-            const index = action.payload;
-            state.array = state.array.filter((_v, i) => i !== index);
-        },
+        connectionRemoveOne: adapter.removeOne,
     },
 });
 
-export const { connectionAdd, connectionDeleteContainingCircleIndex, connectionDeleteAtIndex } = connectionsSlice.actions;
+export const { connectionAddOne, connectionDeleteContainingCircleId, connectionRemoveOne } = connectionsSlice.actions;
 
-export const selectConnections = (state: RootState) => state.connections.array;
+export const selectConnectionsAll = (state: RootState) => adapter.getSelectors().selectAll(state.connections);
 
 export default connectionsSlice.reducer;

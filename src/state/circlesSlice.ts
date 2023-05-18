@@ -1,8 +1,9 @@
-import { PayloadAction, createSlice } from "@reduxjs/toolkit";
-import { RootState } from "./store";
+import { PayloadAction, createSlice, createEntityAdapter } from "@reduxjs/toolkit";
+import { v4 as uuid } from "uuid";
 import { CIRCLE_RADIUS } from "../constants";
+import { RootState } from "./store";
 
-interface Circle {
+export interface Circle {
     id: string,
     x: number,
     y: number,
@@ -10,36 +11,33 @@ interface Circle {
     color: string,
 }
 
-const initialState = {
-    array: new Array<Circle>(),
-};
+const adapter = createEntityAdapter<Circle>({
+    selectId: c => c.id,
+});
 
 const circlesSlice = createSlice({
     name: "circles",
-    initialState,
+    initialState: adapter.getInitialState(),
     reducers: {
-        circlesAdd: (state, action: PayloadAction<{ id: string, x: number, y: number }>) => {
-            state.array = [...state.array, {
-                id: action.payload.id,
+        circlesAddOne: (state, action: PayloadAction<{ x: number, y: number }>) => {
+            adapter.addOne(state, {
+                id: "circle-" + uuid(),
                 x: action.payload.x,
                 y: action.payload.y,
                 radius: CIRCLE_RADIUS,
                 color: "#aaa",
-            }];
+            });
         },
-        circlesUpdateAtIndex: (state, action: PayloadAction<{ index: number, circle: Circle }>) => {
-            state.array = [...state.array];
-            state.array[action.payload.index] = action.payload.circle;
-        },
-        circlesDeleteAtIndex: (state, action: PayloadAction<number>) => {
-            const index = action.payload;
-            state.array = state.array.filter((_v, i) => i !== index);
-        },
+        circlesUpdateOne: adapter.updateOne,
+        circlesRemoveOne: adapter.removeOne,
     },
 });
 
-export const { circlesAdd, circlesUpdateAtIndex, circlesDeleteAtIndex } = circlesSlice.actions;
+export const { circlesAddOne, circlesUpdateOne, circlesRemoveOne } = circlesSlice.actions;
 
-export const selectCircles = (state: RootState) => state.circles.array;
+const selectors = adapter.getSelectors();
+
+export const selectCirclesAll = (state: RootState) => selectors.selectAll(state.circles);
+export const selectCirclesEntities = (state: RootState) => selectors.selectEntities(state.circles);
 
 export default circlesSlice.reducer;
